@@ -3,6 +3,7 @@ from tkinter import *
 from PIL import Image, ImageTk
 import PIL.Image
 import sys
+import serial.tools.list_ports
 
 sys.path.insert(1, './test_functions/')
 
@@ -15,17 +16,28 @@ from image_recognition import *
 
 class App(Frame):
 
-    dropdown_selection_prediction = "MobileNetV2 - Fastest prediction / Moderate Accuracy"
+    dropdown_selection_prediction = "Select Prediction File"
+    dropdown_com_selected = "Select Arduino COM"
     
+    def text_change(self, text):
+        self.text_box.config(state='normal')
+        self.text_box.delete('1.0', END)
+        self.text_box.insert('end', text)
+        self.text_box.config(state='disable')
+        
     def capture(self):
-        takePicture()
+        data = takePicture(self.dropdown_com_selected)
+        res = convertSave()
+        
+        if (data == "Ok" and res == "Ok"):
+            adjust_images()
 
-        convertSave()
-        adjust_images()
-
-        img = ImageTk.PhotoImage(Image.open('temp/image.jpg'))
-        self.label1.configure(image=img)
-        self.label1.image = img
+            img = ImageTk.PhotoImage(Image.open('temp/image.jpg'))
+            self.label1.configure(image=img)
+            self.label1.image = img
+            
+        else: 
+            self.text_change(data)
         
     def importing_image(self):
         import_image()
@@ -44,16 +56,12 @@ class App(Frame):
             with open("temp/prediction_data.txt") as file:
                 data = file.read()
 
-            self.text_box.config(state='normal')
-            self.text_box.delete('1.0', END)
-            self.text_box.insert('end', data)
-            self.text_box.config(state='disable')
+            self.text_change(data)
         
             os.remove("temp/prediction_data.txt")
         else:
-            self.text_box.config(state='normal')
-            self.text_box.insert('end', "\nNo image found.")
-            self.text_box.config(state='disable')
+            data = "Error 3: No image found."
+            self.text_change(data)
     
     def widgets(self):
         img = ImageTk.PhotoImage(PIL.Image.open("default/cam_default.jpg"))
@@ -87,6 +95,24 @@ class App(Frame):
         self.dropdown.config(width=74)
         self.dropdown.place(x=690, y=310)
         
+        # ==========================
+        dropdown_com_options = ["Select Arduino COM"]
+        
+        ports = list(serial.tools.list_ports.comports())
+        for p in ports:
+            dropdown_com_options.append(str(p))
+            
+        default_com_option = StringVar(root)
+        default_com_option.set(dropdown_com_options[0])
+        
+        def dropdown_com_selection(selection):
+            self.dropdown_com_selected = selection
+            
+        self.dropdown_com = OptionMenu(root, default_com_option, *dropdown_com_options, command=dropdown_com_selection)
+        self.dropdown_com.config(width=74)
+        self.dropdown_com.place(x=27, y=540)
+
+        # ==========================
         self.button = Button(root, command=self.prediction, width=44, font=(
             "Arial", 15), text="IA Prediction").place(x=690, y=260)
 
@@ -120,7 +146,6 @@ def exit_application():
         os.remove("temp/prediction_data.txt")
         
     root.destroy()
-
 
 root.protocol("WM_DELETE_WINDOW", exit_application)
 
